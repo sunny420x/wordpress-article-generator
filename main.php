@@ -32,6 +32,7 @@ function gemini_generator_register_settings() {
     register_setting( 'gemini_generator_options', 'gemini_api_key' );
     register_setting( 'gemini_generator_options', 'gemini_model_name' );
     register_setting( 'gemini_generator_options', 'call_to_action' );
+    register_setting( 'gemini_generator_options', 'site_context' );
 }
 
 // 3. ฟังก์ชั่นดึงรายชื่อโมเดลจาก API (เก็บ Cache 5 นาทีเพื่อความรวดเร็ว)
@@ -192,6 +193,12 @@ function gemini_generator_display_admin_page() {
                                 </td>
                             </tr>
                             <tr>
+                                <th scope="row">เนื้อหาของเว็บไซต์ (Site Context):</th>
+                                <td>
+                                    <input type="text" name="site_context" style="width: 100%; max-width: 400px;" value="<?=get_option('site_context')?>" />
+                                </td>
+                            </tr>
+                            <tr>
                                 <th scope="row">Call To Action:</th>
                                 <td>
                                     <?php
@@ -215,7 +222,7 @@ function gemini_generator_display_admin_page() {
                     <h2>✨ สร้างบทความใหม่</h2>
                     <div style="margin-bottom: 15px;">
                         <label for="gemini_topic"><strong>หัวข้อบทความ (Topic):</strong></label><br>
-                        <input type="text" id="gemini_topic" placeholder="เช่น การปรับแต่ง Core Web Vitals สำหรับ WooCommerce" style="width: 100%; max-width: 600px; margin-top: 5px; padding: 8px;" />
+                        <input type="text" id="gemini_topic" style="width: 100%; max-width: 600px; margin-top: 5px; padding: 8px;" />
                     </div>
                     
                     <button id="btn_generate" class="button button-primary button-hero">สร้างบทความเดี๋ยวนี้</button>
@@ -312,13 +319,15 @@ function gemini_generate_post_handler() {
         wp_send_json_error( 'กรุณาตั้งค่า API Key และเลือกโมเดลก่อน' );
     }
 
-    $topic = sanitize_text_field( $_POST['topic'] );$cta = get_option('call_to_action');
+    $topic = sanitize_text_field( $_POST['topic'] );
+    $cta = get_option('call_to_action');
+    $site_context = get_option('site_context');
 
     // 2. เรียกใช้ Gemini API สร้างเนื้อหาบทความ
     // เช็คให้แน่ใจว่า $model_name มีคำว่า 'models/' นำหน้า หรือปรับตามที่เคยบันทึกไว้ในระบบ
     $text_endpoint = 'https://generativelanguage.googleapis.com/v1beta/' . $model_name . ':generateContent?key=' . $api_key;
     
-    $prompt_text = "เขียนบทความบล็อกภาษาไทยที่มีคุณภาพสูงและอ่านง่าย มีการ Optimize สำหรับ SEO เกี่ยวกับหัวข้อ: '{$topic}' 
+    $prompt_text = "เขียนบทความบล็อกภาษาไทยที่มีคุณภาพสูงและอ่านง่าย สำหรับเว็บไซต์ที่เน้นเนื้อหาหมวดหมู่ {$site_context} มีการ Optimize สำหรับ SEO เกี่ยวกับหัวข้อ: '{$topic}' 
     โดยจัดรูปแบบเป็น HTML ให้พร้อมใช้งาน ใช้อย่างน้อย <h2>, <h3>, <p>, <ul> ไม่ต้องครอบด้วยแท็ก <html> <body> หรือ markdown code block และเนื้อหามีความยาวอย่างน้อย 600 คำ";
 
     $text_body = [
