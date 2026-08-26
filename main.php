@@ -327,8 +327,9 @@ function gemini_generate_post_handler() {
     // เช็คให้แน่ใจว่า $model_name มีคำว่า 'models/' นำหน้า หรือปรับตามที่เคยบันทึกไว้ในระบบ
     $text_endpoint = 'https://generativelanguage.googleapis.com/v1beta/' . $model_name . ':generateContent?key=' . $api_key;
     
-    $prompt_text = "เขียนบทความบล็อกภาษาไทยที่มีคุณภาพสูงและอ่านง่าย สำหรับเว็บไซต์ที่เน้นเนื้อหาหมวดหมู่ {$site_context} มีการ Optimize สำหรับ SEO เกี่ยวกับหัวข้อ: '{$topic}' 
-    โดยจัดรูปแบบเป็น HTML ให้พร้อมใช้งาน ใช้อย่างน้อย <h2>, <h3>, <p>, <ul> ไม่ต้องครอบด้วยแท็ก <html> <body> หรือ markdown code block และเนื้อหามีความยาวอย่างน้อย 600 คำ";
+    $prompt_text = "เขียนบทความบล็อกที่มีคุณภาพสูงและอ่านง่าย สำหรับเว็บไซต์ที่เน้นเนื้อหาหมวดหมู่ {$site_context} มีการ Optimize สำหรับ SEO เกี่ยวกับหัวข้อ: '{$topic}' 
+    โดยจัดรูปแบบเป็น HTML ให้พร้อมใช้งาน ใช้อย่างน้อย <h2>, <h3>, <p>, <ul> ไม่ต้องครอบด้วยแท็ก <html> <body> หรือ markdown code block และเนื้อหามีความยาวอย่างน้อย 600 คำ 
+    มีการอ้างอิงข้อมูลท้ายบทความแบบ APA6";
 
     $text_body = [
         'contents' => [ ['parts' => [ ['text' => $prompt_text] ] ] ]
