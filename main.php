@@ -32,6 +32,7 @@ function gemini_generator_register_settings() {
     register_setting( 'gemini_generator_options', 'gemini_api_key' );
     register_setting( 'gemini_generator_options', 'gemini_model_name' );
     register_setting( 'gemini_generator_options', 'call_to_action' );
+    register_setting( 'gemini_generator_options', 'call_to_action_en' );
     register_setting( 'gemini_generator_options', 'site_context' );
 }
 
@@ -199,11 +200,23 @@ function gemini_generator_display_admin_page() {
                                 </td>
                             </tr>
                             <tr>
-                                <th scope="row">Call To Action:</th>
+                                <th scope="row">Call To Action สำหรับบทความภาษาไทย</th>
                                 <td>
                                     <?php
                                     wp_editor( get_option('call_to_action', ''), 'call_to_action', array(
                                         'textarea_name' => 'call_to_action', // The 'name' attribute for the form submission
+                                        'textarea_rows' => 15,                      // Number of visible rows
+                                        'media_buttons' => true,                   // Show "Add Media" buttons
+                                    ));
+                                    ?>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Call To Action สำหรับบทความภาษาอังกฤษ</th>
+                                <td>
+                                    <?php
+                                    wp_editor( get_option('call_to_action_en', ''), 'call_to_action_en', array(
+                                        'textarea_name' => 'call_to_action_en', // The 'name' attribute for the form submission
                                         'textarea_rows' => 15,                      // Number of visible rows
                                         'media_buttons' => true,                   // Show "Add Media" buttons
                                     ));
@@ -222,6 +235,10 @@ function gemini_generator_display_admin_page() {
                     <h2>✨ สร้างบทความใหม่</h2>
                     <div style="margin-bottom: 15px;">
                         <label for="gemini_topic"><strong>หัวข้อบทความ (Topic):</strong></label><br>
+                        <select name="gemini_language" id="gemini_language">
+                            <option value="ภาษาไทย" selected>ภาษาไทย</option>
+                            <option value="ภาษาอังกฤษ">ภาษาอังกฤษ</option>
+                        </select>
                         <input type="text" id="gemini_topic" style="width: 100%; max-width: 600px; margin-top: 5px; padding: 8px;" />
                     </div>
                     
@@ -257,8 +274,15 @@ function gemini_generator_display_admin_page() {
             e.preventDefault();
             
             var topic = $('#gemini_topic').val();
+            var language = $('#gemini_language').val();
+
             if(!topic) {
                 alert('กรุณาระบุหัวข้อบทความ');
+                return;
+            }
+
+            if(!language) {
+                alert('กรุณาระบุภาษาของบทความ')
                 return;
             }
 
@@ -276,6 +300,7 @@ function gemini_generator_display_admin_page() {
                 data: {
                     action: 'gemini_generate_post_ajax',
                     topic: topic,
+                    language: language,
                     security: '<?php echo wp_create_nonce("gemini_generate_nonce"); ?>'
                 },
                 success: function(response) {
@@ -320,16 +345,21 @@ function gemini_generate_post_handler() {
     }
 
     $topic = sanitize_text_field( $_POST['topic'] );
+    $language = sanitize_text_field( $_POST['language'] ) ?? "ภาษาไทย";
+
+    // เงื่อนไขการเลือก Call To Action
     $cta = get_option('call_to_action');
+    if($language == "ภาษาอังกฤษ") {
+        $cta = get_option('call_to_action_en');
+    }
+
     $site_context = get_option('site_context');
 
-    // 2. เรียกใช้ Gemini API สร้างเนื้อหาบทความ
-    // เช็คให้แน่ใจว่า $model_name มีคำว่า 'models/' นำหน้า หรือปรับตามที่เคยบันทึกไว้ในระบบ
     $text_endpoint = 'https://generativelanguage.googleapis.com/v1beta/' . $model_name . ':generateContent?key=' . $api_key;
     
-    $prompt_text = "เขียนบทความบล็อกที่มีคุณภาพสูงและอ่านง่าย สำหรับเว็บไซต์ที่เน้นเนื้อหาหมวดหมู่ {$site_context} มีการ Optimize สำหรับ SEO เกี่ยวกับหัวข้อ: '{$topic}' 
+    $prompt_text = "เขียนบทความบล็อก {$language} ที่มีคุณภาพสูงและอ่านง่าย สำหรับเว็บไซต์ที่เน้นเนื้อหาหมวดหมู่ {$site_context} มีการ Optimize สำหรับ SEO และ AEO เกี่ยวกับหัวข้อ: '{$topic}' 
     โดยจัดรูปแบบเป็น HTML ให้พร้อมใช้งาน ใช้อย่างน้อย <h2>, <h3>, <p>, <ul> ไม่ต้องครอบด้วยแท็ก <html> <body> หรือ markdown code block และเนื้อหามีความยาวอย่างน้อย 600 คำ 
-    มีการอ้างอิงข้อมูลท้ายบทความแบบ APA6";
+    สามารถใช้ตารางเปรียบเทียบข้อมูลได้ (Optional) ตามความเหมาะสมของข้อมูล มีการอ้างอิงข้อมูลท้ายบทความแบบ APA6";
 
     $text_body = [
         'contents' => [ ['parts' => [ ['text' => $prompt_text] ] ] ]
