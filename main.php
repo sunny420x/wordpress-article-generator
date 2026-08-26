@@ -149,7 +149,7 @@ function gemini_generator_display_admin_page() {
             <h1>WordPress Articles Generator</h1>
             <p>ระบบสร้างบทความอัตโนมัติสำหรับ WordPress
             <br>
-            <strong>Github Repository:</strong> <a href="https://github.com/sunny420x/woocommerce-affiliate" target="_blank">https://github.com/sunny420x/woocommerce-affiliate</a>
+            <strong>Github Repository:</strong> <a href="https://github.com/sunny420x/wordpress-article-generator" target="_blank">https://github.com/sunny420x/wordpress-article-generator</a>
             </p>
         </div>
     </div>
