@@ -5,8 +5,9 @@
  * Author: Jirakit Pawnsakungrungrot
  * Author URI: https://www.linkedin.com/in/sunny-jirakit
  * Plugin URI: https://github.com/sunny420x/wordpress-article-generator
- * GitHub Plugin URI: https://github.com/sunny420x/woocommerce-article-generator
+ * GitHub Plugin URI: https://github.com/sunny420x/wordpress-article-generator
  * Primary Branch: master
+ * Version: 1.0.0
  * License: GPL2
 */
 
