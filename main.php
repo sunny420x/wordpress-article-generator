@@ -33,6 +33,7 @@ function gemini_generator_add_admin_menu() {
 add_action( 'admin_init', 'gemini_generator_register_settings' );
 function gemini_generator_register_settings() {
     register_setting( 'gemini_generator_options', 'gemini_api_key' );
+    register_setting( 'gemini_generator_options', 'openai_api_key' );
     register_setting( 'gemini_generator_options', 'gemini_model_name' );
     register_setting( 'gemini_generator_options', 'call_to_action' );
     register_setting( 'gemini_generator_options', 'call_to_action_en' );
@@ -71,6 +72,7 @@ function gemini_get_available_models( $api_key ) {
 // 4. หน้า UI หลังบ้าน
 function gemini_generator_display_admin_page() {
     $api_key = get_option( 'gemini_api_key' );
+    $openai_api_key = get_option( 'openai_api_key' );
     $selected_model = get_option( 'gemini_model_name', 'models/gemini-1.5-flash' );
     $available_models = gemini_get_available_models( $api_key );
     ?>
@@ -175,6 +177,13 @@ function gemini_generator_display_admin_page() {
                                 <td>
                                     <input type="password" name="gemini_api_key" value="<?php echo esc_attr( $api_key ); ?>" style="width: 100%; max-width: 400px;" />
                                     <p class="description">รับ API Key ได้ที่ <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
+                                </td>
+                            </tr>
+                            <tr valign="top">
+                                <th scope="row">OpenAI API Key สำหรับสร้างรูปปกบทความ</th>
+                                <td>
+                                    <input type="password" name="openai_api_key" value="<?php echo esc_attr( $openai_api_key ); ?>" style="width: 100%; max-width: 400px;" />
+                                    <p class="description">ไม่บังคับ หากกรอกไว้ระบบจะใช้ OpenAI Images API สร้างภาพปกและตั้งเป็น Featured Image อัตโนมัติ (<a href="https://platform.openai.com/api-keys" target="_blank">จัดการ API Key</a>)</p>
                                 </td>
                             </tr>
                             <tr valign="top">
@@ -310,8 +319,14 @@ function gemini_generator_display_admin_page() {
                     $btn.prop('disabled', false);
                     if(response.success) {
                         $status.text('✅ สร้างบทความสำเร็จ!').css('color', 'green');
+                        var image_notice = response.data.image_warning
+                            ? '<br><span style="color:#996800;">คำเตือน: ' + $('<div>').text(response.data.image_warning).html() + '</span>'
+                            : response.data.image_created
+                                ? '<br><span style="color:green;">สร้างภาพปกและตั้งเป็น Featured Image แล้ว</span>'
+                                : '<br><span>ไม่ได้สร้างภาพปก เนื่องจากยังไม่ได้ตั้ง OpenAI API Key</span>';
                         $result.html(
                             '<strong>สถานะ:</strong> สร้างเป็น Draft เรียบร้อย<br>' +
+                            image_notice +
                             '<a href="' + response.data.edit_url + '" target="_blank" class="button button-primary" style="margin-top:10px;">ไปที่หน้าแก้ไขบทความ (Edit Post)</a>'
                         ).show();
                     } else {
@@ -341,14 +356,20 @@ function gemini_generate_post_handler() {
         wp_send_json_error( 'คุณไม่มีสิทธิ์สร้างบทความ' );
     }
 
-    $api_key = get_option( 'gemini_api_key' );$model_name = get_option( 'gemini_model_name' ); 
+    $api_key = get_option( 'gemini_api_key' );
+    $model_name = get_option( 'gemini_model_name' );
+    $openai_api_key = get_option( 'openai_api_key' );
     
     if ( empty( $api_key ) || empty($model_name ) ) {
         wp_send_json_error( 'กรุณาตั้งค่า API Key และเลือกโมเดลก่อน' );
     }
 
-    $topic = sanitize_text_field( $_POST['topic'] );
-    $language = sanitize_text_field( $_POST['language'] ) ?? "ภาษาไทย";
+    $topic = isset( $_POST['topic'] ) ? sanitize_text_field( wp_unslash( $_POST['topic'] ) ) : '';
+    $language = isset( $_POST['language'] ) ? sanitize_text_field( wp_unslash( $_POST['language'] ) ) : 'ภาษาไทย';
+
+    if ( empty( $topic ) ) {
+        wp_send_json_error( 'กรุณาระบุหัวข้อบทความ' );
+    }
 
     // เงื่อนไขการเลือก Call To Action
     $cta = get_option('call_to_action');
@@ -407,9 +428,96 @@ function gemini_generate_post_handler() {
         wp_send_json_error( 'บันทึกบทความลง WordPress ไม่สำเร็จ' );
     }
 
+    $image_error = '';
+    $image_created = false;
+
+    if ( ! empty( $openai_api_key ) ) {
+        $image_response = wp_remote_post( 'https://api.openai.com/v1/images/generations', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $openai_api_key,
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => wp_json_encode([
+                'model'  => 'gpt-image-1',
+                'prompt' => 'Create a professional editorial cover image for a blog article titled "' . $topic . '". Only Title text is preferred. No additional text, letters, logos, watermarks, or UI elements. 
+                            Match the subject and language-neutral visual meaning of the topic. Clean composition, suitable for a WordPress featured image.',
+                'size'   => '1536x1024',
+            ]),
+            'timeout' => 120,
+        ]);
+
+        if ( is_wp_error( $image_response ) ) {
+            $image_error = 'เชื่อมต่อ OpenAI ไม่สำเร็จ: ' . $image_response->get_error_message();
+        } else {
+            $image_data = json_decode( wp_remote_retrieve_body( $image_response ), true );
+            $image_source = $image_data['data'][0]['b64_json'] ?? '';
+            $image_url = $image_data['data'][0]['url'] ?? '';
+
+            if ( isset( $image_data['error']['message'] ) ) {
+                $image_error = 'OpenAI Image API Error: ' . $image_data['error']['message'];
+            } elseif ( ! empty( $image_source ) || ! empty( $image_url ) ) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+                require_once ABSPATH . 'wp-admin/includes/media.php';
+                require_once ABSPATH . 'wp-admin/includes/image.php';
+
+                $image_saved = false;
+
+                if ( ! empty( $image_source ) ) {
+                    $temporary_file = wp_tempnam( $topic . '.png' );
+                    if ( ! $temporary_file ) {
+                        $image_error = 'ไม่สามารถสร้างไฟล์ชั่วคราวสำหรับภาพได้';
+                    } else {
+                        $decoded_image = base64_decode( $image_source, true );
+                        $image_saved = false !== $decoded_image && file_put_contents( $temporary_file, $decoded_image ) !== false;
+                        if ( ! $image_saved ) {
+                            $image_error = 'ถอดรหัสหรือบันทึกภาพจาก OpenAI ไม่สำเร็จ';
+                            @unlink( $temporary_file );
+                        }
+                    }
+                } else {
+                    $downloaded_image = download_url( $image_url, 120 );
+                    if ( ! is_wp_error( $downloaded_image ) ) {
+                        $temporary_file = $downloaded_image;
+                        $image_saved = true;
+                    } else {
+                        $image_error = 'ดาวน์โหลดภาพจาก OpenAI ไม่สำเร็จ: ' . $downloaded_image->get_error_message();
+                    }
+                }
+
+                if ( $image_saved ) {
+                    $image_file = [
+                        'name'     => sanitize_file_name( $topic ) . '.png',
+                        'type'     => 'image/png',
+                        'tmp_name' => $temporary_file,
+                        'error'    => 0,
+                        'size'     => filesize( $temporary_file ),
+                    ];
+                    $attachment_id = media_handle_sideload( $image_file, $post_id, $topic );
+
+                    if ( is_wp_error( $attachment_id ) ) {
+                        $image_error = 'นำภาพเข้า Media Library ไม่สำเร็จ: ' . $attachment_id->get_error_message();
+                        @unlink( $temporary_file );
+                    } else {
+                        set_post_thumbnail( $post_id, $attachment_id );
+                        $image_created = true;
+                    }
+                }
+            } else {
+                $image_error = 'OpenAI ไม่ได้ส่งข้อมูลภาพกลับมา';
+            }
+        }
+    }
+
     // 4. ส่งค่าความสำเร็จและ URL สำหรับให้ User กดเข้าไปหน้าแก้ไข
-    wp_send_json_success([
+    $result = [
         'post_id'  => $post_id,
-        'edit_url' => admin_url( 'post.php?post=' . $post_id . '&action=edit' )
-    ]);
+        'edit_url' => admin_url( 'post.php?post=' . $post_id . '&action=edit' ),
+        'image_created' => $image_created,
+    ];
+
+    if ( ! empty( $image_error ) ) {
+        $result['image_warning'] = $image_error;
+    }
+
+    wp_send_json_success( $result );
 }
