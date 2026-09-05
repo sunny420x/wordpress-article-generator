@@ -350,10 +350,10 @@ function gemini_generator_display_admin_page() {
                     if(response.success) {
                         $status.text('✅ สร้างบทความสำเร็จ!').css('color', 'green');
                         var image_notice = response.data.image_warning
-                            ? '<br><span style="color:#996800;">คำเตือน: ' + $('<div>').text(response.data.image_warning).html() + '</span>'
+                            ? '<br><span style="color:#996800;">' + $('<div>').text(response.data.image_warning).html() + '</span><br>'
                             : response.data.image_created
-                                ? '<br><span style="color:green;">สร้างภาพปกและตั้งเป็น Featured Image แล้ว</span>'
-                                : '<br><span>ไม่ได้สร้างภาพปก</span>';
+                                ? '<br><span style="color:green;">สร้างภาพปกและตั้งเป็น Featured Image แล้ว</span><br>'
+                                : '<br><span>ไม่ได้สร้างภาพปก</span><br><span style="color:#996800;">(หากต้องการสร้างภาพปก กรุณาเลือกโมเดล Image Model ในหน้า Settings)</span><br>';
                         $result.html(
                             '<strong>สถานะ:</strong> สร้างเป็น Draft เรียบร้อย<br>' +
                             image_notice +
