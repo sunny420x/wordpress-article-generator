@@ -72,35 +72,17 @@ function gemini_get_available_models( $api_key ) {
 function gemini_get_available_image_models( $api_key ) {
     if ( empty( $api_key ) ) return [];
 
-    $transient_key = 'gemini_api_image_models_' . md5( $api_key );
-    $models = get_transient( $transient_key );
+    $models = [];
+    $available_models = gemini_get_available_models( $api_key );
 
-    if ( false === $models ) {
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models?key=' . rawurlencode( $api_key );
-        $response = wp_remote_get( $url, [ 'timeout' => 15 ] );
-
-        if ( ! is_wp_error( $response ) ) {
-            $body = json_decode( wp_remote_retrieve_body( $response ), true );
-            $models = [];
-
-            if ( isset( $body['models'] ) ) {
-                foreach ( $body['models'] as $model ) {
-                    $model_name = strtolower( $model['name'] ?? '' );
-                    $display_name = strtolower( $model['displayName'] ?? '' );
-                    if (
-                        isset( $model['supportedGenerationMethods'] ) &&
-                        in_array( 'generateContent', $model['supportedGenerationMethods'], true ) &&
-                        ( false !== strpos( $model_name, 'image' ) || false !== strpos( $display_name, 'image' ) || false !== strpos( $display_name, 'banana' ) )
-                    ) {
-                        $models[ $model['name'] ] = ( $model['displayName'] ?? $model['name'] ) . ' (' . str_replace( 'models/', '', $model['name'] ) . ')';
-                    }
-                }
-                set_transient( $transient_key, $models, 300 );
-            }
+    foreach ( $available_models as $model_name => $label ) {
+        $search_text = strtolower( $model_name . ' ' . $label );
+        if ( false !== strpos( $search_text, 'image' ) || false !== strpos( $search_text, 'banana' ) ) {
+            $models[ $model_name ] = $label;
         }
     }
 
-    return $models ?: [];
+    return $models;
 }
 
 // 4. หน้า UI หลังบ้าน
