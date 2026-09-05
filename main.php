@@ -85,7 +85,13 @@ function gemini_get_available_image_models( $api_key ) {
 
             if ( isset( $body['models'] ) ) {
                 foreach ( $body['models'] as $model ) {
-                    if ( isset( $model['supportedGenerationMethods'] ) && in_array( 'predict', $model['supportedGenerationMethods'], true ) ) {
+                    $model_name = strtolower( $model['name'] ?? '' );
+                    $display_name = strtolower( $model['displayName'] ?? '' );
+                    if (
+                        isset( $model['supportedGenerationMethods'] ) &&
+                        in_array( 'generateContent', $model['supportedGenerationMethods'], true ) &&
+                        ( false !== strpos( $model_name, 'image' ) || false !== strpos( $display_name, 'image' ) || false !== strpos( $display_name, 'banana' ) )
+                    ) {
                         $models[ $model['name'] ] = ( $model['displayName'] ?? $model['name'] ) . ' (' . str_replace( 'models/', '', $model['name'] ) . ')';
                     }
                 }
@@ -232,7 +238,7 @@ function gemini_generator_display_admin_page() {
                                 <td>
                                     <select name="gemini_image_model_name" style="width: 100%; max-width: 400px;">
                                         <?php if ( empty( $available_image_models ) && ! empty( $api_key ) ) : ?>
-                                            <option value="">ไม่พบโมเดลภาพที่รองรับ predict</option>
+                                            <option value="">ไม่พบโมเดล Gemini สำหรับสร้างภาพ</option>
                                         <?php elseif ( empty( $api_key ) ) : ?>
                                             <option value="">กรุณาใส่ API Key แล้วกดบันทึกก่อน</option>
                                         <?php else : ?>
@@ -244,7 +250,7 @@ function gemini_generator_display_admin_page() {
                                             <?php endforeach; ?>
                                         <?php endif; ?>
                                     </select>
-                                    <p class="description">ระบบจะแสดงเฉพาะโมเดล Gemini ที่ API ระบุว่ารองรับเมธอด predict สำหรับสร้างภาพ</p>
+                                    <p class="description">ระบบจะแสดงเฉพาะโมเดล Gemini สำหรับสร้างภาพที่รองรับ generateContent เช่น Nano Banana</p>
                                 </td>
                             </tr>
                             <tr>
@@ -474,54 +480,61 @@ function gemini_generate_post_handler() {
     $image_created = false;
 
     if ( ! empty( $image_model_name ) ) {
-        $image_endpoint = 'https://generativelanguage.googleapis.com/v1beta/' . $image_model_name . ':predict?key=' . rawurlencode( $api_key );
+        $image_endpoint = 'https://generativelanguage.googleapis.com/v1beta/' . $image_model_name . ':generateContent?key=' . rawurlencode( $api_key );
         $image_response = wp_remote_post( $image_endpoint, [
-        'headers' => [ 'Content-Type' => 'application/json' ],
-        'body'    => wp_json_encode([
-            'instances' => [
-                [
-                    'prompt' => 'Create a professional editorial cover image for a blog article titled "' . $topic . '". No text, letters, logos, watermarks, or UI elements. Match the subject and language-neutral visual meaning of the topic. Clean composition, suitable for a WordPress featured image.',
+            'headers' => [ 'Content-Type' => 'application/json' ],
+            'body'    => wp_json_encode([
+                'contents' => [
+                    [
+                        'parts' => [
+                            [
+                                'text' => 'Create a professional editorial cover image for a blog article titled "' . $topic . '". No text, letters, logos, watermarks, or UI elements. Match the subject and language-neutral visual meaning of the topic. Clean composition, suitable for a WordPress featured image.',
+                            ],
+                        ],
+                    ],
                 ],
-            ],
-            'parameters' => [
-                'sampleCount' => 1,
-                'aspectRatio' => '16:9',
-            ],
-        ]),
-        'timeout' => 120,
+                'generationConfig' => [
+                    'responseModalities' => [ 'TEXT', 'IMAGE' ],
+                ],
+            ]),
+            'timeout' => 120,
         ]);
 
         if ( is_wp_error( $image_response ) ) {
             $image_error = 'เชื่อมต่อ Gemini Image API ไม่สำเร็จ: ' . $image_response->get_error_message();
         } else {
             $image_data = json_decode( wp_remote_retrieve_body( $image_response ), true );
-            $image_source = $image_data['predictions'][0]['bytesBase64Encoded'] ?? '';
+            $image_part = [];
+
+            foreach ( $image_data['candidates'][0]['content']['parts'] ?? [] as $part ) {
+                if ( ! empty( $part['inlineData']['data'] ) ) {
+                    $image_part = $part['inlineData'];
+                    break;
+                }
+            }
 
             if ( isset( $image_data['error']['message'] ) ) {
                 $image_error = 'Gemini Image API Error: ' . $image_data['error']['message'];
-            } elseif ( ! empty( $image_source ) ) {
+            } elseif ( ! empty( $image_part['data'] ) ) {
                 require_once ABSPATH . 'wp-admin/includes/file.php';
                 require_once ABSPATH . 'wp-admin/includes/media.php';
                 require_once ABSPATH . 'wp-admin/includes/image.php';
 
-                $image_saved = false;
+                $mime_type = $image_part['mimeType'] ?? 'image/png';
+                $file_extension = 'image/jpeg' === $mime_type ? 'jpg' : ( 'image/webp' === $mime_type ? 'webp' : 'png' );
+                $temporary_file = wp_tempnam( $topic . '.' . $file_extension );
+                $decoded_image = base64_decode( $image_part['data'], true );
+                $image_saved = $temporary_file && false !== $decoded_image && file_put_contents( $temporary_file, $decoded_image ) !== false;
 
-                $temporary_file = wp_tempnam( $topic . '.png' );
-                if ( ! $temporary_file ) {
-                    $image_error = 'ไม่สามารถสร้างไฟล์ชั่วคราวสำหรับภาพได้';
-                } else {
-                    $decoded_image = base64_decode( $image_source, true );
-                    $image_saved = false !== $decoded_image && file_put_contents( $temporary_file, $decoded_image ) !== false;
-                    if ( ! $image_saved ) {
-                        $image_error = 'ถอดรหัสหรือบันทึกภาพจาก Gemini ไม่สำเร็จ';
+                if ( ! $image_saved ) {
+                    $image_error = 'ถอดรหัสหรือบันทึกภาพจาก Gemini ไม่สำเร็จ';
+                    if ( $temporary_file ) {
                         @unlink( $temporary_file );
                     }
-                }
-
-                if ( $image_saved ) {
+                } else {
                     $image_file = [
-                        'name'     => sanitize_file_name( $topic ) . '.png',
-                        'type'     => 'image/png',
+                        'name'     => sanitize_file_name( $topic ) . '.' . $file_extension,
+                        'type'     => $mime_type,
                         'tmp_name' => $temporary_file,
                         'error'    => 0,
                         'size'     => filesize( $temporary_file ),
