@@ -1,5 +1,9 @@
+<img width="250" height="250" alt="AI-article-logo" src="https://github.com/user-attachments/assets/d8a44cdd-c3a4-490c-a823-a4f47f7d7a9e" />
+
 ## ระบบนี้คืออะไร ?
 <strong>WordPress Articles Generator</strong> เป็นปลั๊กอิน WordPress ที่ออกแบบมาเพื่อช่วยให้นักพัฒนาและเจ้าของเว็บไซต์สามารถสร้างบทความคุณภาพสูงพร้อมรูปภาพประกอบอัตโนมัติได้อย่างรวดเร็วผ่าน <strong>Google Gemini API</strong>
+
+<img width="1740" height="795" alt="image" src="https://github.com/user-attachments/assets/f51cc38c-c0e9-408b-9bbf-ebbe0a8531bb" />
 
 ## วิธีการติดตั้ง
 
