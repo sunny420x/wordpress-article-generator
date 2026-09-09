@@ -166,12 +166,16 @@ function gemini_generator_display_admin_page() {
         }
     </style>
     <div class="white-label-zone no-print">
-        <span style="padding: 40px 10px 40px 40px;float: left;font-size: 60px;">📝</span>
+        <!-- <span style="padding: 40px 10px 40px 40px;float: left;font-size: 60px;">📝</span> -->
+        <img src="<?php echo esc_url( plugin_dir_url( __FILE__ ) . 'plugin-logo.jpg' ); ?>" " alt="Plugin Logo" style="width: 125px; height: auto; float: left; margin: 40px 10px 40px 20px; border-radius: 20px;">
         <div style="padding: 20px 0;">
             <h1>WordPress Articles Generator</h1>
-            <p>ระบบสร้างบทความอัตโนมัติสำหรับ WordPress
-            <br>
-            <strong>Github Repository:</strong> <a href="https://github.com/sunny420x/wordpress-article-generator" target="_blank">https://github.com/sunny420x/wordpress-article-generator</a>
+            <p>ระบบสร้างบทความอัตโนมัติสำหรับ WordPress</p>
+            <p>
+            <strong>Github Repository:</strong> <a href="https://github.com/sunny420x/wordpress-article-generator" target="_blank">https://github.com/sunny420x/wordpress-article-generator</a><br>
+            <!-- <strong>Documentation:</strong> <a href="https://github.com/sunny420x/wordpress-article-generator/wiki" target="_blank">https://github.com/sunny420x/wordpress-article-generator/wiki</a><br> -->
+            <strong>Support:</strong> <a href="https://github.com/sunny420x/wordpress-article-generator/issues" target="_blank">https://github.com/sunny420x/wordpress-article-generator/issues</a><br>
+            <strong>Developer:</strong> <a href="https://sunny420x.com" target="_blank">https://sunny420x.com</a>
             </p>
         </div>
     </div>
